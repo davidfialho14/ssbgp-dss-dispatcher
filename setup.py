@@ -13,6 +13,10 @@ setup(
 
     install_requires=[],
 
+    package_data={
+        'ssbgp-dss-dispatcher': ['dss_dispatcher/tables.sql'],
+    },
+
     extras_require={
         'test': ['pytest'],
     },
