@@ -228,3 +228,25 @@ def test_DeleteExistingSimulation_DBDoesNotContainThatSimInAnyTable(database):
             connection.running_simulations())
         assert (simulation, "#sim1", finish_datetime) not in list(
             connection.complete_simulations())
+
+
+# noinspection PyShadowingNames
+def test_NextSimulation_QueueContainsSimsWithPriority1and10and30_ReturnsSim30(
+        database):
+    with database.connect() as connection:
+        connection.insert_simulator("#sim1")
+        connection.insert_simulation(create_simulation("#1"))
+        connection.insert_simulation(create_simulation("#2"))
+        connection.insert_simulation(create_simulation("#3"))
+        connection.insert_in_queue("#1", 10)
+        connection.insert_in_queue("#2", 30)
+        connection.insert_in_queue("#3", 1)
+
+        assert connection.next_simulation() == create_simulation("#2")
+
+
+# noinspection PyShadowingNames
+def test_NextSimulation_QueueTableIsEmpty_ReturnNone(
+        database):
+    with database.connect() as connection:
+        assert connection.next_simulation() is None

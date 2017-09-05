@@ -47,6 +47,8 @@ class Connection:
         # This allows provides access to each column by name
         self._connection.row_factory = sqlite3.Row
 
+    # region Insert Methods
+
     def insert_simulator(self, id: str):
         """
         Inserts a new simulator in the database.
@@ -121,6 +123,10 @@ class Connection:
         self._insert_in('complete', simulation_id, simulator_id,
                         finish_datetime.strftime(self.DATETIME_FORMAT))
 
+    # endregion
+
+    # region Delete Methods
+
     def delete_simulation(self, simulation_id: str):
         """
         Deletes a simulation from the DB. It deletes the simulation from all
@@ -154,6 +160,10 @@ class Connection:
         :param simulation_id: ID of the simulation to delete
         """
         self._delete_from("running", simulation_id)
+
+    # endregion
+
+    # region List Methods
 
     # noinspection PyTypeChecker
     def simulators(self):
@@ -241,14 +251,25 @@ class Connection:
             yield simulation, row['simulator_id'], finish_datetime
             row = cursor.fetchone()
 
+    # endregion
+
     def next_simulation(self) -> Simulation:
         """
         Returns the simulation in the queue with the highest priority. If
         there are multiple simulations with the same priority value,
         it returns one of them.
 
-        :return: simulation from the queue with the highest priority
+        :return: simulation from the queue with the highest priority or None
+        if the `queue` table is empty
         """
+        cursor = self._connection.cursor()
+        cursor.execute(
+            "SELECT * FROM simulation JOIN queue ON simulation.id == queue.id "
+            "WHERE priority IN (SELECT max(priority) FROM queue);")
+
+        row = cursor.fetchone()
+        if row:
+            return _simulation_fromrow(row)
 
     def execute_script(self, fp):
         """ Executes a script from an opened file """
