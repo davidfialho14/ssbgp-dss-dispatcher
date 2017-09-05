@@ -54,17 +54,7 @@ class Connection:
         :param id: ID of the new simulator
         :raise EntryExistsError: if the DB contains a simulator with the same ID
         """
-        try:
-            self._connection.cursor().execute(
-                "INSERT INTO simulator VALUES (?)", (id,))
-
-        except sqlite3.IntegrityError as error:
-            if _is_unique_constraint(error):
-                raise EntryExistsError("DB already contains simulator "
-                                       "with ID `%s`" % id)
-
-            # Just re-raise any other errors
-            raise
+        self._insert_in('simulator', id)
 
     def insert_simulation(self, simulation: Simulation):
         """
@@ -74,18 +64,7 @@ class Connection:
         :raise EntryExistsError: if the DB contains a simulation with the
         same ID of the simulation to be inserted
         """
-        try:
-            self._connection.cursor().execute(
-                "INSERT INTO simulation VALUES "
-                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", simulation)
-
-        except sqlite3.IntegrityError as error:
-            if _is_unique_constraint(error):
-                raise EntryExistsError("DB already contains simulation "
-                                       "with ID `%s`" % simulation.id)
-
-            # Just re-raise any other errors
-            raise
+        self._insert_in('simulation', *simulation)
 
     def insert_in_queue(self, simulation_id: str, priority: int):
         """
@@ -101,22 +80,7 @@ class Connection:
         :raise EntryExistsError: if a simulation with the same ID is already
         in the `queue` table
         """
-        try:
-            self._connection.cursor().execute(
-                "INSERT INTO queue VALUES (?, ?)",
-                (simulation_id, priority))
-
-        except sqlite3.IntegrityError as error:
-            if _is_foreign_key_constraint(error):
-                raise EntryNotFoundError("DB does not contain simulation "
-                                         "with ID `%s`" % simulation_id)
-            elif _is_unique_constraint(error):
-                raise EntryExistsError("Table `queue` already contains "
-                                       "simulation with ID `%s`" %
-                                       simulation_id)
-
-            # Just re-raise any other errors
-            raise
+        self._insert_in('queue', simulation_id, priority)
 
     def insert_in_running(self, simulation_id: str, simulator_id: str):
         """
@@ -134,23 +98,7 @@ class Connection:
         :raise EntryExistsError: if a simulation with the same ID is already
         in the `running` table
         """
-        try:
-            self._connection.cursor().execute(
-                "INSERT INTO running VALUES (?, ?)",
-                (simulator_id, simulation_id))
-
-        except sqlite3.IntegrityError as error:
-
-            if _is_foreign_key_constraint(error):
-                raise EntryNotFoundError("DB does not contain simulation "
-                                         "with ID `%s`" % simulation_id)
-            elif _is_unique_constraint(error):
-                raise EntryExistsError("Table `running` already contains "
-                                       "simulation with ID `%s`" %
-                                       simulation_id)
-
-            # Just re-raise any other errors
-            raise
+        self._insert_in('running', simulation_id, simulator_id)
 
     def insert_in_complete(self, simulation_id: str, simulator_id: str,
                            finish_datetime: datetime):
@@ -170,20 +118,37 @@ class Connection:
         :raise EntryExistsError: if a simulation with the same ID is already
         in the `complete` table
         """
+        self._insert_in('complete', simulation_id, simulator_id,
+                        finish_datetime.strftime(self.DATETIME_FORMAT))
+
+    def _insert_in(self, table: str, id, *values):
+        """
+        Inserts an entry into a table with the specified name.
+
+        :param table:  name of the table to insert entry to
+        :param id:     ID to assign the entry
+        :param values: extra values the entry includes
+        :raise EntryExistsError: if the exists in the table
+        :raise EntryNotFoundError: if a required entry does not exist in the
+        database. This can be a simulation or a simulator.
+        """
         try:
+            expected_values = ",".join("?" for i in range(len(values) + 1))
+            all_values = [id]
+            all_values.extend(values)
+
             self._connection.cursor().execute(
-                "INSERT INTO complete VALUES (?, ?, ?)",
-                (simulator_id, simulation_id,
-                 finish_datetime.strftime(self.DATETIME_FORMAT)))
+                "INSERT INTO %s VALUES (%s)" % (table, expected_values),
+                all_values)
 
         except sqlite3.IntegrityError as error:
             if _is_foreign_key_constraint(error):
-                raise EntryNotFoundError("DB does not contain simulation "
-                                         "with ID `%s`" % simulation_id)
+                raise EntryNotFoundError("DB `%s` does not contain entry "
+                                         "with ID `%s`" % (table, id))
+
             elif _is_unique_constraint(error):
-                raise EntryExistsError("Table `complete` already contains "
-                                       "simulation with ID `%s`" %
-                                       simulation_id)
+                raise EntryExistsError("Table `%s` already contains entry with "
+                                       "ID `%s`" % (table, id))
 
             # Just re-raise any other errors
             raise

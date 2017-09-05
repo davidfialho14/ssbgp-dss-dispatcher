@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS queue (
 
 
 CREATE TABLE IF NOT EXISTS running (
-  simulator_id  TEXT,
   simulation_id TEXT,
+  simulator_id  TEXT,
 
   -- Here we do not want to allow deleting simulators associated with
   -- simulations
@@ -42,8 +42,8 @@ CREATE TABLE IF NOT EXISTS running (
 
 
 CREATE TABLE IF NOT EXISTS complete (
-  simulator_id  TEXT,
   simulation_id TEXT,
+  simulator_id  TEXT,
   finish_datetime TEXT NOT NULL,
 
   -- Here we do not want to allow deleting simulators associated with
