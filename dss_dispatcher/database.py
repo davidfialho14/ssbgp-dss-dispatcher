@@ -25,6 +25,8 @@ class SimulationDatabase:
     CREATE_TABLES_SCRIPT = resource_filename(
         Requirement.parse("ssbgp-dss-dispatcher"), 'dss_dispatcher/tables.sql')
 
+    DATETIME_FORMAT = "%Y-%m-%d_%H:%M:%S"
+
     def __init__(self, db_file: str):
         self._db_file = db_file
 
@@ -103,7 +105,7 @@ class SimulationDatabase:
         # Remove simulation from `queue` table
         with self._connect() as connection:
             connection.cursor().execute(
-                "DELETE FROM queue WHERE simulation_id=?", (simulation_id, ))
+                "DELETE FROM queue WHERE simulation_id=?", (simulation_id,))
 
             # Insert simulation into `running` table
             try:
@@ -113,8 +115,9 @@ class SimulationDatabase:
             except sqlite3.IntegrityError as error:
 
                 if 'FOREIGN KEY constraint failed' in str(error):
-                    raise EntryNotFoundError("Database does not contain simulation "
-                                             "with ID `%s`" % simulation_id)
+                    raise EntryNotFoundError(
+                        "Database does not contain simulation "
+                        "with ID `%s`" % simulation_id)
 
                 elif 'UNIQUE constraint failed' in str(error):
                     raise EntryExistsError("Simulation already exists in the "
@@ -123,14 +126,41 @@ class SimulationDatabase:
                 # Just re-raise any other errors
                 raise
 
-    def moveto_complete(self, simulation_id: str, finish_datetime: datetime):
+    def moveto_complete(self, simulation_id: str, simulator_id: int,
+                        finish_datetime: datetime):
         """
         Removes a simulation from the `running` table and inserts it in the
         `complete` table.
 
         :param simulation_id:   ID of the simulation to move
+        :param simulator_id:    ID of the simulator that executed the simulation
         :param finish_datetime: date and time when the simulation finished
         """
+        # Remove simulation from `running` table
+        with self._connect() as connection:
+            connection.cursor().execute(
+                "DELETE FROM running WHERE simulation_id=?", (simulation_id,))
+
+            # Insert simulation into `complete` table
+            try:
+                connection.cursor().execute(
+                    "INSERT INTO complete VALUES (?, ?, ?)",
+                    (simulator_id, simulation_id,
+                     finish_datetime.strftime(self.DATETIME_FORMAT)))
+
+            except sqlite3.IntegrityError as error:
+
+                if 'FOREIGN KEY constraint failed' in str(error):
+                    raise EntryNotFoundError(
+                        "Database does not contain simulation "
+                        "with ID `%s`" % simulation_id)
+
+                elif 'UNIQUE constraint failed' in str(error):
+                    raise EntryExistsError("Simulation already exists in the "
+                                           "database")
+
+                # Just re-raise any other errors
+                raise
 
     def insert_simulator(self, id: str):
         """
@@ -142,7 +172,7 @@ class SimulationDatabase:
         try:
             with self._connect() as connection:
                 connection.cursor().execute(
-                    "INSERT INTO simulator VALUES (?)", (id, ))
+                    "INSERT INTO simulator VALUES (?)", (id,))
 
         except sqlite3.IntegrityError as error:
 
@@ -206,11 +236,26 @@ class SimulationDatabase:
                 yield self._simulation_fromrow(row), row['simulator_id']
                 row = cursor.fetchone()
 
+    # noinspection PyTypeChecker
     def complete_simulations(self):
         """
         Generator that returns each simulation in the `complete` table in no
-        particular order.
+        particular order. Along with the simulation it also returns the
+        ID of the simulator the executed the simulation and the finish datetime.
         """
+        with self._connect() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                "SELECT * FROM simulation JOIN complete ON id == simulation_id;")
+
+            row = cursor.fetchone()
+            while row:
+                simulation = self._simulation_fromrow(row)
+                finish_datetime = datetime.strptime(row['finish_datetime'],
+                                                    self.DATETIME_FORMAT)
+
+                yield simulation, row['simulator_id'], finish_datetime
+                row = cursor.fetchone()
 
     def next_simulation(self) -> Simulation:
         """
@@ -258,14 +303,14 @@ class SimulationDatabase:
     @staticmethod
     def _simulation_fromrow(row) -> Simulation:
         return simulation_with(
-                    id=row['id'],
-                    report_path=row['report_path'],
-                    topology=row['topology'],
-                    destination=row['destination'],
-                    repetitions=row['repetitions'],
-                    min_delay=row['min_delay'],
-                    max_delay=row['max_delay'],
-                    threshold=row['threshold'],
-                    stubs_file=row['stubs_file'],
-                    seed=row['seed'],
-                )
+            id=row['id'],
+            report_path=row['report_path'],
+            topology=row['topology'],
+            destination=row['destination'],
+            repetitions=row['repetitions'],
+            min_delay=row['min_delay'],
+            max_delay=row['max_delay'],
+            threshold=row['threshold'],
+            stubs_file=row['stubs_file'],
+            seed=row['seed'],
+        )

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pytest import fixture, raises
 
 from dss_dispatcher.database import SimulationDatabase, EntryExistsError, \
@@ -117,3 +119,19 @@ def test_MoveSimToRunningTable_RunningTableContainsSimAndQueueDoesNot(database):
 
     assert (simulation, "sim#1234") in list(database.running_simulations())
     assert (simulation, 10) not in list(database.queued_simulations())
+
+
+# noinspection PyShadowingNames
+def test_MoveSimToCompleteTable_CompleteTableContainsSimAndRunningDoesNot(
+        database):
+    simulation = create_simulation("#1234")
+    database.insert_simulation(simulation)
+    database.insert_simulator(id="sim#1234")
+    database.moveto_queue(simulation.id, priority=10)
+    database.moveto_running(simulation.id, simulator_id="sim#1234")
+    finish_datetime = datetime(1900, 1, 1, 1, 1, 1)
+
+    database.moveto_complete(simulation.id, "sim#1234", finish_datetime)
+
+    assert (simulation, "sim#1234", finish_datetime) in list(database.complete_simulations())
+    assert (simulation, "sim#1234") not in list(database.running_simulations())
