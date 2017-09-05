@@ -334,7 +334,7 @@ class Connection:
             "DELETE FROM %s WHERE id=?" % table, (entry_id,))
 
 
-class SimulationDatabase:
+class SimulationDB:
     """ Abstraction o access the simulations database """
 
     # Path to script used to create the DB tables

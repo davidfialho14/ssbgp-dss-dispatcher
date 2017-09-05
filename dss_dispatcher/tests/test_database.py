@@ -2,14 +2,14 @@ from datetime import datetime
 
 from pytest import fixture, raises
 
-from dss_dispatcher.database import SimulationDatabase, EntryExistsError, \
+from dss_dispatcher.database import SimulationDB, EntryExistsError, \
     EntryNotFoundError
 from dss_dispatcher.simulation import simulation_with
 
 
 @fixture
 def database(tmpdir):
-    return SimulationDatabase(str(tmpdir.join("file.db")))
+    return SimulationDB(str(tmpdir.join("file.db")))
 
 
 def create_simulation(id: str):
