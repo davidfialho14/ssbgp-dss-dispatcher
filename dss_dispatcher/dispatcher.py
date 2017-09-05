@@ -1,3 +1,18 @@
+import uuid
+from datetime import datetime
+
+from dss_dispatcher.database import SimulationDB, EntryExistsError
+from dss_dispatcher.simulation import Simulation
+
+
+class OperationError(Exception):
+    """ Raised for an operation error that cannot be handled """
+
+    def __init__(self, message, raised):
+        self.message = message
+        self.raised = raised
+
+
 class Dispatcher:
     """
     The dispatcher distributes simulations to multiple simulators which
@@ -19,6 +34,9 @@ class Dispatcher:
     uniquely identify it in the system.
     """
 
+    def __init__(self, database: SimulationDB):
+        self._database = database
+
     def register(self) -> str:
         """
         Registers a simulator with the system and returns the unique ID of
@@ -26,15 +44,42 @@ class Dispatcher:
 
         :return: the ID assigned to the new simulator
         """
+        with self._database.connect() as connection:
 
-    def next_simulation(self, simulator_id: str) -> dict:
+            while True:
+                # Generate a new ID for the new simulator
+                simulator_id = uuid.uuid4()
+
+                try:
+                    connection.insert_simulator(simulator_id)
+                    return simulator_id
+
+                except EntryExistsError:
+                    # There is already a simulator with that ID
+                    # Try again
+                    continue
+
+    def next_simulation(self, simulator_id: str) -> Simulation:
         """
         It pops the next simulation in the queue, assigns it to the simulator
         with the specified ID, and returns the simulation parameters.
 
-        :param simulator_id:
-        :return: the simulation parameters of the next simulation in the queue
+        :param simulator_id: Id of the simulator requesting a new simulation
+        :return: the simulation with the highest priority in the queue or
+        None if the queue is empty.
         """
+        with self._database.connect() as connection:
+            try:
+                simulation = connection.next_simulation()
+                if simulation:
+                    # Assign simulation to this simulator
+                    connection.insert_in_running(simulation.id, simulator_id)
+
+                return simulation
+
+            except Exception as error:
+                connection.rollback()
+                raise OperationError(str(error), error)
 
     def notify_finished(self, simulator_id: str, simulation_id: str):
         """
@@ -44,6 +89,10 @@ class Dispatcher:
         :param simulator_id:  ID of the simulator that executed the simulation
         :param simulation_id: ID of the simulation that was executed
         """
+        with self._database.connect as connection:
+            connection.delete_from_running(simulation_id)
+            connection.insert_in_complete(simulation_id, simulator_id,
+                                          datetime.now())
 
     def notify_failed(self, simulator_id: str, simulation_id: str):
         """
