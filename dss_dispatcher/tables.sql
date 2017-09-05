@@ -18,31 +18,31 @@ CREATE TABLE IF NOT EXISTS simulator (
 
 
 CREATE TABLE IF NOT EXISTS queue (
-  simulation_id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   priority      INT NOT NULL,
 
-  FOREIGN KEY (simulation_id) REFERENCES simulation
+  FOREIGN KEY (id) REFERENCES simulation
     ON DELETE CASCADE
 );
 
 
 CREATE TABLE IF NOT EXISTS running (
-  simulation_id TEXT,
+  id TEXT,
   simulator_id  TEXT,
 
   -- Here we do not want to allow deleting simulators associated with
   -- simulations
   FOREIGN KEY (simulator_id) REFERENCES simulator
     ON DELETE NO ACTION,
-  FOREIGN KEY (simulation_id) REFERENCES simulation
+  FOREIGN KEY (id) REFERENCES simulation
     ON DELETE CASCADE,
 
-  PRIMARY KEY (simulator_id, simulation_id)
+  PRIMARY KEY (simulator_id, id)
 );
 
 
 CREATE TABLE IF NOT EXISTS complete (
-  simulation_id TEXT,
+  id TEXT,
   simulator_id  TEXT,
   finish_datetime TEXT NOT NULL,
 
@@ -50,8 +50,8 @@ CREATE TABLE IF NOT EXISTS complete (
   -- simulations
   FOREIGN KEY (simulator_id) REFERENCES simulator
     ON DELETE NO ACTION,
-  FOREIGN KEY (simulation_id) REFERENCES simulation
+  FOREIGN KEY (id) REFERENCES simulation
     ON DELETE CASCADE,
 
-  PRIMARY KEY (simulator_id, simulation_id)
+  PRIMARY KEY (simulator_id, id)
 );
