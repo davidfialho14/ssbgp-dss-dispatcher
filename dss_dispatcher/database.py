@@ -19,188 +19,241 @@ class EntryNotFoundError(Exception):
     """
 
 
-class SimulationDatabase:
-    """ Abstraction o access the simulations database """
+class DeleteError(Exception):
+    """
+    Raised when trying to delete an entry that can not be deleted.
+    """
 
-    CREATE_TABLES_SCRIPT = resource_filename(
-        Requirement.parse("ssbgp-dss-dispatcher"), 'dss_dispatcher/tables.sql')
 
+class Connection:
+    """
+    An abstraction for a DB connection that provides specific methods to
+    perform specific operations relevant to the simulations DB.
+
+    All operations performed on a connection are only committed either when
+    the commit() method is called or when the connection is closed.
+    """
+
+    # Datetime format used to store the simulation's finish timestamps
     DATETIME_FORMAT = "%Y-%m-%d_%H:%M:%S"
 
-    def __init__(self, db_file: str):
-        self._db_file = db_file
+    def __init__(self, connection: sqlite3.Connection):
+        self._connection = connection
 
-        # Load the create tables script
-        with open(self.CREATE_TABLES_SCRIPT) as file:
-            script = file.read()
+        # Enable foreign keys because they are not enabled by default
+        self._connection.execute('PRAGMA foreign_keys=ON')
 
-        # Create tables if necessary
-        with self._connect() as connection:
-            connection.cursor().executescript(script)
+        # Use a row factory to return the query results
+        # This allows provides access to each column by name
+        self._connection.row_factory = sqlite3.Row
 
-    # region Modify methods
+    def insert_simulator(self, id: str):
+        """
+        Inserts a new simulator in the database.
+
+        :param id: ID of the new simulator
+        :raise EntryExistsError: if the DB contains a simulator with the same ID
+        """
+        try:
+            self._connection.cursor().execute(
+                "INSERT INTO simulator VALUES (?)", (id,))
+
+        except sqlite3.IntegrityError as error:
+            if _is_unique_constraint(error):
+                raise EntryExistsError("DB already contains simulator "
+                                       "with ID `%s`" % id)
+
+            # Just re-raise any other errors
+            raise
 
     def insert_simulation(self, simulation: Simulation):
         """
         Inserts a new simulation in the database.
 
         :param simulation: simulation to insert
-        :raise EntryExistsError: if a simulation with the same ID already exists
+        :raise EntryExistsError: if the DB contains a simulation with the
+        same ID of the simulation to be inserted
         """
         try:
-            with self._connect() as connection:
-                connection.cursor().execute(
-                    "INSERT INTO simulation VALUES "
-                    "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", simulation)
+            self._connection.cursor().execute(
+                "INSERT INTO simulation VALUES "
+                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", simulation)
 
         except sqlite3.IntegrityError as error:
-
-            if 'UNIQUE constraint failed' in str(error):
-                raise EntryExistsError("Simulation already exists in the "
-                                       "database")
+            if _is_unique_constraint(error):
+                raise EntryExistsError("DB already contains simulation "
+                                       "with ID `%s`" % simulation.id)
 
             # Just re-raise any other errors
             raise
 
-    def moveto_queue(self, simulation_id: str, priority: int):
+    def insert_in_queue(self, simulation_id: str, priority: int):
         """
         Inserts the simulation with the specified ID in the `queue` table.
+        It associates the simulation with a priority value.
 
-        It assigns the simulation a priority value, used to sort simulations
-        in queue. Simulations with an higher priority will be executed first.
-        An higher value corresponds to an higher priority.
+        To insert a simulation in the `queue` table it must have already been
+        inserted in the DB.
 
-        :param simulation_id: ID of the simulation to move
-        :param priority:      priority value
+        :param simulation_id: ID of the simulation to insert in `queue`
+        :param priority:      priority value to assign the simulation
         :raise EntryNotFoundError: if the simulation does not exist
         :raise EntryExistsError: if a simulation with the same ID is already
-        in the queue table
+        in the `queue` table
         """
         try:
-            with self._connect() as connection:
-                connection.cursor().execute("INSERT INTO queue VALUES (?, ?)",
-                                            (simulation_id, priority))
+            self._connection.cursor().execute(
+                "INSERT INTO queue VALUES (?, ?)",
+                (simulation_id, priority))
 
         except sqlite3.IntegrityError as error:
-
-            if 'FOREIGN KEY constraint failed' in str(error):
-                raise EntryNotFoundError("Database does not contain simulation "
+            if _is_foreign_key_constraint(error):
+                raise EntryNotFoundError("DB does not contain simulation "
                                          "with ID `%s`" % simulation_id)
-
-            elif 'UNIQUE constraint failed' in str(error):
-                raise EntryExistsError("Simulation already exists in the "
-                                       "database")
+            elif _is_unique_constraint(error):
+                raise EntryExistsError("Table `queue` already contains "
+                                       "simulation with ID `%s`" %
+                                       simulation_id)
 
             # Just re-raise any other errors
             raise
 
-    def moveto_running(self, simulation_id: str, simulator_id: str):
+    def insert_in_running(self, simulation_id: str, simulator_id: str):
         """
-        Removes a simulation from the `queue` table and inserts it in the
-        `running` table.
+        Inserts the simulation with the specified ID in the `running` table.
+        It associates the simulation with the ID of the simulator that was
+        assigned to execute it.
 
-        :param simulation_id: ID of the simulation to move
-        :param simulator_id:  ID of the simulator executing the simulation
-        """
-        # Remove simulation from `queue` table
-        with self._connect() as connection:
-            connection.cursor().execute(
-                "DELETE FROM queue WHERE simulation_id=?", (simulation_id,))
+        To insert a simulation in the `running` table, the simulation and the
+        simulator must have already been inserted in the DB.
 
-            # Insert simulation into `running` table
-            try:
-                connection.cursor().execute("INSERT INTO running VALUES (?, ?)",
-                                            (simulator_id, simulation_id))
-
-            except sqlite3.IntegrityError as error:
-
-                if 'FOREIGN KEY constraint failed' in str(error):
-                    raise EntryNotFoundError(
-                        "Database does not contain simulation "
-                        "with ID `%s`" % simulation_id)
-
-                elif 'UNIQUE constraint failed' in str(error):
-                    raise EntryExistsError("Simulation already exists in the "
-                                           "database")
-
-                # Just re-raise any other errors
-                raise
-
-    def moveto_complete(self, simulation_id: str, simulator_id: int,
-                        finish_datetime: datetime):
-        """
-        Removes a simulation from the `running` table and inserts it in the
-        `complete` table.
-
-        :param simulation_id:   ID of the simulation to move
-        :param simulator_id:    ID of the simulator that executed the simulation
-        :param finish_datetime: date and time when the simulation finished
-        """
-        # Remove simulation from `running` table
-        with self._connect() as connection:
-            connection.cursor().execute(
-                "DELETE FROM running WHERE simulation_id=?", (simulation_id,))
-
-            # Insert simulation into `complete` table
-            try:
-                connection.cursor().execute(
-                    "INSERT INTO complete VALUES (?, ?, ?)",
-                    (simulator_id, simulation_id,
-                     finish_datetime.strftime(self.DATETIME_FORMAT)))
-
-            except sqlite3.IntegrityError as error:
-
-                if 'FOREIGN KEY constraint failed' in str(error):
-                    raise EntryNotFoundError(
-                        "Database does not contain simulation "
-                        "with ID `%s`" % simulation_id)
-
-                elif 'UNIQUE constraint failed' in str(error):
-                    raise EntryExistsError("Simulation already exists in the "
-                                           "database")
-
-                # Just re-raise any other errors
-                raise
-
-    def insert_simulator(self, id: str):
-        """
-        Inserts a new simulator in the database.
-
-        :param id: ID of the simulator (mus tbe unique)
-        :raise EntryExistsError: if a simulator with the same ID already exists
+        :param simulation_id: ID of the simulation to insert in `running`
+        :param simulator_id:  ID of the simulator to execute the simulation
+        :raise EntryNotFoundError: if the DB does not contain a simulation
+        and/or a simulator with the specified IDs
+        :raise EntryExistsError: if a simulation with the same ID is already
+        in the `running` table
         """
         try:
-            with self._connect() as connection:
-                connection.cursor().execute(
-                    "INSERT INTO simulator VALUES (?)", (id,))
+            self._connection.cursor().execute(
+                "INSERT INTO running VALUES (?, ?)",
+                (simulator_id, simulation_id))
 
         except sqlite3.IntegrityError as error:
 
-            if 'UNIQUE constraint failed' in str(error):
-                raise EntryExistsError("Simulator already exists in the "
-                                       "database")
+            if _is_foreign_key_constraint(error):
+                raise EntryNotFoundError("DB does not contain simulation "
+                                         "with ID `%s`" % simulation_id)
+            elif _is_unique_constraint(error):
+                raise EntryExistsError("Table `running` already contains "
+                                       "simulation with ID `%s`" %
+                                       simulation_id)
 
             # Just re-raise any other errors
             raise
 
-    # endregion
+    def insert_in_complete(self, simulation_id: str, simulator_id: str,
+                           finish_datetime: datetime):
+        """
+        Inserts the simulation with the specified ID in the `complete` table.
+        It associates the simulation with the ID of the simulator that
+        executed the simulation and the datetime at which it finished executing.
 
-    # region Access methods
+        To insert a simulation in the `complete` table, the simulation and the
+        simulator must have already been inserted in the DB.
+
+        :param simulation_id:   ID of the simulation to insert in `complete`
+        :param simulator_id:    ID of the simulator to execute the simulation
+        :param finish_datetime: datetime when the simulation finished executing
+        :raise EntryNotFoundError: if the DB does not contain a simulation
+        and/or a simulator with the specified IDs
+        :raise EntryExistsError: if a simulation with the same ID is already
+        in the `complete` table
+        """
+        try:
+            self._connection.cursor().execute(
+                "INSERT INTO complete VALUES (?, ?, ?)",
+                (simulator_id, simulation_id,
+                 finish_datetime.strftime(self.DATETIME_FORMAT)))
+
+        except sqlite3.IntegrityError as error:
+            if _is_foreign_key_constraint(error):
+                raise EntryNotFoundError("DB does not contain simulation "
+                                         "with ID `%s`" % simulation_id)
+            elif _is_unique_constraint(error):
+                raise EntryExistsError("Table `complete` already contains "
+                                       "simulation with ID `%s`" %
+                                       simulation_id)
+
+            # Just re-raise any other errors
+            raise
+
+    def delete_simulation(self, simulation_id: str):
+        """
+        Deletes a simulation from the DB. It deletes the simulation from all
+        tables of the DB.
+
+        If the DB does not contain a simulation with the specified ID,
+        then the method has no effect.
+
+        :param simulation_id: ID of the simulation to delete
+        """
+        self._connection.cursor().execute(
+            "DELETE FROM simulation WHERE id=?", (simulation_id,))
+
+    def delete_from_queue(self, simulation_id: str):
+        """
+        Deletes a simulation from the `queue` table.
+
+        If the `queue` table does not contain a simulation with the specified
+        ID, then the method has no effect.
+
+        :param simulation_id: ID of the simulation to delete
+        """
+        self._connection.cursor().execute(
+            "DELETE FROM queue WHERE simulation_id=?", (simulation_id,))
+
+    def delete_from_running(self, simulation_id: str):
+        """
+        Deletes a simulation from the `queue` table.
+
+        If the `queue` table does not contain a simulation with the specified
+        ID, then the method has no effect.
+
+        :param simulation_id: ID of the simulation to delete
+        """
+        self._connection.cursor().execute(
+            "DELETE FROM running WHERE simulation_id=?", (simulation_id,))
+
+    # WARNING: Usually, we don't want to delete simulations from the
+    # `complete` table
 
     # noinspection PyTypeChecker
+    def simulators(self):
+        """
+        Generator that returns the IDs of each simulator included in the
+        `simulator` table.
+        """
+        cursor = self._connection.cursor()
+        cursor.execute("SELECT * FROM simulator")
+
+        row = cursor.fetchone()
+        while row:
+            yield row['id']
+            row = cursor.fetchone()
+
     def all_simulations(self):
         """
         Generator that returns each simulation that was inserted in the
         database. This includes queued, running, and complete simulations.
         """
-        with self._connect() as connection:
-            cursor = connection.cursor()
-            cursor.execute("SELECT * FROM simulation")
+        cursor = self._connection.cursor()
+        cursor.execute("SELECT * FROM simulation")
 
+        row = cursor.fetchone()
+        while row:
+            yield _simulation_fromrow(row)
             row = cursor.fetchone()
-            while row:
-                yield self._simulation_fromrow(row)
-                row = cursor.fetchone()
 
     # noinspection PyTypeChecker
     def queued_simulations(self):
@@ -209,15 +262,14 @@ class SimulationDatabase:
         by priority: simulations with higher priority first. Along with the
         simulation it also returns the corresponding priority.
         """
-        with self._connect() as connection:
-            cursor = connection.cursor()
-            cursor.execute(
-                "SELECT * FROM simulation JOIN queue ON id == simulation_id;")
+        cursor = self._connection.cursor()
+        cursor.execute(
+            "SELECT * FROM simulation JOIN queue ON id == simulation_id;")
 
+        row = cursor.fetchone()
+        while row:
+            yield _simulation_fromrow(row), row['priority']
             row = cursor.fetchone()
-            while row:
-                yield self._simulation_fromrow(row), row['priority']
-                row = cursor.fetchone()
 
     # noinspection PyTypeChecker
     def running_simulations(self):
@@ -226,15 +278,14 @@ class SimulationDatabase:
         particular order. Along with the simulation it also returns the
         ID of the simulator executing the simulation.
         """
-        with self._connect() as connection:
-            cursor = connection.cursor()
-            cursor.execute(
-                "SELECT * FROM simulation JOIN running ON id == simulation_id;")
+        cursor = self._connection.cursor()
+        cursor.execute(
+            "SELECT * FROM simulation JOIN running ON id == simulation_id;")
 
+        row = cursor.fetchone()
+        while row:
+            yield _simulation_fromrow(row), row['simulator_id']
             row = cursor.fetchone()
-            while row:
-                yield self._simulation_fromrow(row), row['simulator_id']
-                row = cursor.fetchone()
 
     # noinspection PyTypeChecker
     def complete_simulations(self):
@@ -243,19 +294,18 @@ class SimulationDatabase:
         particular order. Along with the simulation it also returns the
         ID of the simulator the executed the simulation and the finish datetime.
         """
-        with self._connect() as connection:
-            cursor = connection.cursor()
-            cursor.execute(
-                "SELECT * FROM simulation JOIN complete ON id == simulation_id;")
+        cursor = self._connection.cursor()
+        cursor.execute(
+            "SELECT * FROM simulation JOIN complete ON id == simulation_id;")
 
+        row = cursor.fetchone()
+        while row:
+            simulation = _simulation_fromrow(row)
+            finish_datetime = datetime.strptime(row['finish_datetime'],
+                                                self.DATETIME_FORMAT)
+
+            yield simulation, row['simulator_id'], finish_datetime
             row = cursor.fetchone()
-            while row:
-                simulation = self._simulation_fromrow(row)
-                finish_datetime = datetime.strptime(row['finish_datetime'],
-                                                    self.DATETIME_FORMAT)
-
-                yield simulation, row['simulator_id'], finish_datetime
-                row = cursor.fetchone()
 
     def next_simulation(self) -> Simulation:
         """
@@ -266,51 +316,72 @@ class SimulationDatabase:
         :return: simulation from the queue with the highest priority
         """
 
-    # noinspection PyTypeChecker
-    def simulators(self):
+    def commit(self):
+        """ Commits the current operations """
+        self._connection.commit()
+
+    def rollback(self):
+        """ Rolls back the operations performed since the last commit """
+        self._connection.rollback()
+
+    def close(self):
+        """ Closes the connection. Afterwards, the connection cannot be used """
+        self._connection.close()
+
+    def execute_script(self, fp):
+        """ Executes a script from an opened file """
+        script = fp.read()
+        self._connection.cursor().executescript(script)
+
+
+class SimulationDatabase:
+    """ Abstraction o access the simulations database """
+
+    # Path to script used to create the DB tables
+    CREATE_TABLES_SCRIPT = resource_filename(
+        Requirement.parse("ssbgp-dss-dispatcher"), 'dss_dispatcher/tables.sql')
+
+    def __init__(self, db_file):
         """
-        Generator that returns the IDs of each simulator included in the
-        `simulator` table.
+        Initializes a new simulation DB.
+
+        :param db_file: path to DB file
         """
-        with self._connect() as connection:
-            cursor = connection.cursor()
-            cursor.execute("SELECT * FROM simulator")
+        self._db_file = db_file
 
-            row = cursor.fetchone()
-            while row:
-                yield row['id']
-                row = cursor.fetchone()
-
-    # endregion
-
-    # region Helper private methods
+        # Create tables if necessary
+        with open(self.CREATE_TABLES_SCRIPT) as file:
+            with self.connect() as connection:
+                connection.execute_script(file)
 
     @contextmanager
-    def _connect(self) -> sqlite3.Connection:
-        """ Connects to the DB and yields the connection """
+    def connect(self) -> Connection:
+        """
+        Connects to the database and yields a connection. It closes the
+        connection when it is called to exit.
+        """
         with sqlite3.connect(database=self._db_file) as connection:
-            # Enable foreign keys because they are not enabled by default
-            connection.execute('PRAGMA foreign_keys=ON')
+            yield Connection(connection)
 
-            # Use a row factory to return the query results
-            # This allows provides access to each column by name
-            connection.row_factory = sqlite3.Row
 
-            yield connection
+def _is_unique_constraint(error: sqlite3.IntegrityError):
+    return 'UNIQUE constraint failed' in str(error)
 
-            # endregion
 
-    @staticmethod
-    def _simulation_fromrow(row) -> Simulation:
-        return simulation_with(
-            id=row['id'],
-            report_path=row['report_path'],
-            topology=row['topology'],
-            destination=row['destination'],
-            repetitions=row['repetitions'],
-            min_delay=row['min_delay'],
-            max_delay=row['max_delay'],
-            threshold=row['threshold'],
-            stubs_file=row['stubs_file'],
-            seed=row['seed'],
-        )
+def _is_foreign_key_constraint(error: sqlite3.IntegrityError):
+    return 'FOREIGN KEY constraint failed' in str(error)
+
+
+def _simulation_fromrow(row) -> Simulation:
+    return simulation_with(
+        id=row['id'],
+        report_path=row['report_path'],
+        topology=row['topology'],
+        destination=row['destination'],
+        repetitions=row['repetitions'],
+        min_delay=row['min_delay'],
+        max_delay=row['max_delay'],
+        threshold=row['threshold'],
+        stubs_file=row['stubs_file'],
+        seed=row['seed'],
+    )

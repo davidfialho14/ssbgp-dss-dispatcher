@@ -28,110 +28,203 @@ def create_simulation(id: str):
 
 
 # noinspection PyShadowingNames
-def test_InsertASimulation_EmptyDB_TheDBContainsThatSimulation(database):
-    simulation = create_simulation("#1234")
+def test_InsertSimulator_EmptyDB_TheDBContainsThatSimulator(database):
+    with database.connect() as connection:
+        simulator_id = "#sim1"
+        connection.insert_simulator(simulator_id)
 
-    database.insert_simulation(simulation)
-
-    assert simulation in list(database.all_simulations())
+        assert simulator_id in list(connection.simulators())
 
 
 # noinspection PyShadowingNames
 def test_InsertMultipleSimulations_TheDBContainsAllSimulations(database):
-    simulation1 = create_simulation("#1234")
-    simulation2 = create_simulation("#5678")
+    with database.connect() as connection:
+        simulator_id1 = "#sim1"
+        simulator_id2 = "#sim2"
 
-    database.insert_simulation(simulation1)
-    database.insert_simulation(simulation2)
+        connection.insert_simulator(simulator_id1)
+        connection.insert_simulator(simulator_id2)
 
-    assert simulation1 in list(database.all_simulations())
-    assert simulation2 in list(database.all_simulations())
-
-
-# noinspection PyShadowingNames
-def test_InsertSameSimulationTwice_RaisesEntryExistsError(database):
-    simulation = create_simulation("#1234")
-    database.insert_simulation(simulation)
-
-    with raises(EntryExistsError):
-        database.insert_simulation(simulation)
+        simulators = list(connection.simulators())
+        assert simulator_id1 in simulators
+        assert simulator_id2 in simulators
 
 
 # noinspection PyShadowingNames
-def test_MoveExistingSimToEmptyQueue_QueueTableThatSingleSim(database):
-    simulation = create_simulation("#1234")
-    database.insert_simulation(simulation)
-    database.insert_simulation(create_simulation("#5678"))
-    database.insert_simulation(create_simulation("#1357"))
+def test_InsertSimulation_EmptyDB_TheDBContainsThatSimulation(database):
+    with database.connect() as connection:
+        simulation = create_simulation("#1234")
 
-    database.moveto_queue(simulation.id, priority=10)
+        connection.insert_simulation(simulation)
 
-    queue_sims = list(database.queued_simulations())
-    assert (simulation, 10) in queue_sims
-    assert len(queue_sims) == 1
-
-
-# noinspection PyShadowingNames
-def test_MoveNonExistingSimToQueue_RaisesEntryNotFoundError(database):
-    simulation = create_simulation("#1234")
-    database.insert_simulation(create_simulation("#5678"))
-    database.insert_simulation(create_simulation("#1357"))
-
-    with raises(EntryNotFoundError):
-        database.moveto_queue(simulation.id, priority=10)
-
-
-# noinspection PyShadowingNames
-def test_MoveSimToQueueThatIsAlreadyInTheQueue_RaisesEntryExistsError(database):
-    simulation = create_simulation("#1234")
-    database.insert_simulation(create_simulation("#1234"))
-    database.moveto_queue(simulation.id, priority=10)
-
-    with raises(EntryExistsError):
-        database.moveto_queue(simulation.id, priority=10)
-
-
-# noinspection PyShadowingNames
-def test_InsertASimulator_EmptyDB_TheDBContainsThatSimulatorID(database):
-    database.insert_simulator(id="#1234")
-
-    assert "#1234" in list(database.simulators())
+        assert simulation in list(connection.all_simulations())
 
 
 # noinspection PyShadowingNames
 def test_InsertMultipleSimulators_TheDBContainsAllSimulators(database):
-    database.insert_simulator(id="#1234")
-    database.insert_simulator(id="#5678")
+    with database.connect() as connection:
+        simulation1 = create_simulation("#1234")
+        simulation2 = create_simulation("#5678")
 
-    simulators = list(database.simulators())
-    assert "#1234" in simulators
-    assert "#5678" in simulators
+        connection.insert_simulation(simulation1)
+        connection.insert_simulation(simulation2)
 
-
-# noinspection PyShadowingNames
-def test_MoveSimToRunningTable_RunningTableContainsSimAndQueueDoesNot(database):
-    simulation = create_simulation("#1234")
-    database.insert_simulation(simulation)
-    database.insert_simulator(id="sim#1234")
-    database.moveto_queue(simulation.id, priority=10)
-
-    database.moveto_running(simulation.id, simulator_id="sim#1234")
-
-    assert (simulation, "sim#1234") in list(database.running_simulations())
-    assert (simulation, 10) not in list(database.queued_simulations())
+        assert simulation1 in list(connection.all_simulations())
+        assert simulation2 in list(connection.all_simulations())
 
 
 # noinspection PyShadowingNames
-def test_MoveSimToCompleteTable_CompleteTableContainsSimAndRunningDoesNot(
+def test_InsertSameSimulationTwice_RaisesEntryExistsError(database):
+    with database.connect() as connection:
+        simulation = create_simulation("#1234")
+        connection.insert_simulation(simulation)
+
+        with raises(EntryExistsError):
+            connection.insert_simulation(simulation)
+
+
+# noinspection PyShadowingNames
+def test_InsertSimInQueue_SimExistsInDB_QueueContainsThatSim(database):
+    with database.connect() as connection:
+        simulation = create_simulation("#1234")
+        connection.insert_simulation(simulation)
+
+        connection.insert_in_queue(simulation.id, priority=10)
+
+        assert (simulation, 10) in list(connection.queued_simulations())
+
+
+# noinspection PyShadowingNames
+def test_InsertSimInQueue_SimNotInDB_RaisesEntryNotFoundError(database):
+    with database.connect() as connection:
+        simulation = create_simulation("#1234")
+
+        with raises(EntryNotFoundError):
+            connection.insert_in_queue(simulation.id, priority=10)
+
+
+# noinspection PyShadowingNames
+def test_InsertSimInQueue_SimAlreadyInQueue_RaisesEntryNotFoundError(database):
+    with database.connect() as connection:
+        simulation = create_simulation("#1234")
+        connection.insert_simulation(simulation)
+        connection.insert_in_queue(simulation.id, priority=10)
+
+        with raises(EntryExistsError):
+            connection.insert_in_queue(simulation.id, priority=10)
+
+
+# noinspection PyShadowingNames
+def test_InsertSimInRunning_SimExistsInDB_RunningContainsThatSim(database):
+    with database.connect() as connection:
+        connection.insert_simulator("#sim1")
+        simulation = create_simulation("#1234")
+        connection.insert_simulation(simulation)
+
+        connection.insert_in_running(simulation.id, simulator_id="#sim1")
+
+        assert (simulation, "#sim1") in list(connection.running_simulations())
+
+
+# noinspection PyShadowingNames
+def test_InsertSimInRunning_SimNotInDB_RaisesEntryNotFoundError(database):
+    with database.connect() as connection:
+        connection.insert_simulator("#sim1")
+        simulation = create_simulation("#1234")
+
+        with raises(EntryNotFoundError):
+            connection.insert_in_running(simulation.id, simulator_id="#sim1")
+
+
+# noinspection PyShadowingNames
+def test_InsertSimInRunning_SimulatorNotInDB_RaisesEntryNotFoundError(database):
+    with database.connect() as connection:
+        simulation = create_simulation("#1234")
+        connection.insert_simulation(simulation)
+
+        with raises(EntryNotFoundError):
+            connection.insert_in_running(simulation.id, simulator_id="#sim1")
+
+
+# noinspection PyShadowingNames
+def test_InsertSimInRunning_SimInRunning_RaisesEntryNotFoundError(database):
+    with database.connect() as connection:
+        connection.insert_simulator("#sim1")
+        simulation = create_simulation("#1234")
+        connection.insert_simulation(simulation)
+        connection.insert_in_running(simulation.id, simulator_id="#sim1")
+
+        with raises(EntryExistsError):
+            connection.insert_in_running(simulation.id, simulator_id="#sim1")
+
+
+# noinspection PyShadowingNames
+def test_InsertSimInComplete_SimExistsInDB_CompleteContainsThatSim(database):
+    with database.connect() as connection:
+        connection.insert_simulator("#sim1")
+        simulation = create_simulation("#1234")
+        connection.insert_simulation(simulation)
+        finish_datetime = datetime(1900, 1, 1, 1, 1)
+
+        connection.insert_in_complete(simulation.id, "#sim1", finish_datetime)
+
+        assert (simulation, "#sim1", finish_datetime) in list(
+            connection.complete_simulations())
+
+
+# noinspection PyShadowingNames
+def test_InsertSimInComplete_SimNotInDB_RaisesEntryNotFoundError(database):
+    with database.connect() as connection:
+        connection.insert_simulator("#sim1")
+        simulation = create_simulation("#1234")
+
+        with raises(EntryNotFoundError):
+            connection.insert_in_complete(simulation.id, "#sim1",
+                                          datetime(1900, 1, 1, 1, 1))
+
+
+# noinspection PyShadowingNames
+def test_InsertSimInComplete_SimulatorNotInDB_RaisesEntryNotFoundError(
         database):
-    simulation = create_simulation("#1234")
-    database.insert_simulation(simulation)
-    database.insert_simulator(id="sim#1234")
-    database.moveto_queue(simulation.id, priority=10)
-    database.moveto_running(simulation.id, simulator_id="sim#1234")
-    finish_datetime = datetime(1900, 1, 1, 1, 1, 1)
+    with database.connect() as connection:
+        simulation = create_simulation("#1234")
+        connection.insert_simulation(simulation)
 
-    database.moveto_complete(simulation.id, "sim#1234", finish_datetime)
+        with raises(EntryNotFoundError):
+            connection.insert_in_complete(simulation.id, "#sim1",
+                                          datetime(1900, 1, 1, 1, 1))
 
-    assert (simulation, "sim#1234", finish_datetime) in list(database.complete_simulations())
-    assert (simulation, "sim#1234") not in list(database.running_simulations())
+
+# noinspection PyShadowingNames
+def test_InsertSimInComplete_SimInComplete_RaisesEntryNotFoundError(database):
+    with database.connect() as connection:
+        connection.insert_simulator("#sim1")
+        simulation = create_simulation("#1234")
+        connection.insert_simulation(simulation)
+        finish_datetime = datetime(1900, 1, 1, 1, 1)
+        connection.insert_in_complete(simulation.id, "#sim1", finish_datetime)
+
+        with raises(EntryExistsError):
+            connection.insert_in_complete(simulation.id, "#sim1",
+                                          finish_datetime)
+
+
+# noinspection PyShadowingNames
+def test_DeleteExistingSimulation_DBDoesNotContainThatSimInAnyTable(database):
+    with database.connect() as connection:
+        connection.insert_simulator("#sim1")
+        simulation = create_simulation("#1234")
+        connection.insert_simulation(simulation)
+        connection.insert_in_queue(simulation.id, 10)
+        connection.insert_in_running(simulation.id, "#sim1")
+        finish_datetime = datetime(1900, 1, 1, 1, 1)
+        connection.insert_in_complete(simulation.id, "#sim1", finish_datetime)
+
+        connection.delete_simulation("#1234")
+
+        assert simulation not in list(connection.all_simulations())
+        assert (simulation, 10) not in list(connection.queued_simulations())
+        assert (simulation, "#sim1") not in list(
+            connection.running_simulations())
+        assert (simulation, "#sim1", finish_datetime) not in list(
+            connection.complete_simulations())

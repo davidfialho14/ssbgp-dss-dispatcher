@@ -30,9 +30,10 @@ CREATE TABLE IF NOT EXISTS running (
   simulator_id  TEXT,
   simulation_id TEXT,
 
+  -- Here we do not want to allow deleting simulators associated with
+  -- simulations
   FOREIGN KEY (simulator_id) REFERENCES simulator
-    ON DELETE CASCADE,
-
+    ON DELETE NO ACTION,
   FOREIGN KEY (simulation_id) REFERENCES simulation
     ON DELETE CASCADE,
 
@@ -45,9 +46,10 @@ CREATE TABLE IF NOT EXISTS complete (
   simulation_id TEXT,
   finish_datetime TEXT NOT NULL,
 
+  -- Here we do not want to allow deleting simulators associated with
+  -- simulations
   FOREIGN KEY (simulator_id) REFERENCES simulator
-    ON DELETE CASCADE,
-
+    ON DELETE NO ACTION,
   FOREIGN KEY (simulation_id) REFERENCES simulation
     ON DELETE CASCADE,
 
