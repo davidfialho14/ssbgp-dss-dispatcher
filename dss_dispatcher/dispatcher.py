@@ -70,10 +70,15 @@ class Dispatcher:
         """
         with self._database.connect() as connection:
             try:
-                simulation = connection.next_simulation()
-                if simulation:
-                    # Assign simulation to this simulator
-                    connection.insert_in_running(simulation.id, simulator_id)
+                # Check if this simulator was already assigned a simulation
+                # Return that simulation if it was
+                simulation = connection.running_simulation(simulator_id)
+                if not simulation:
+                    # If not, then obtain the next simulation in the queue
+                    simulation = connection.next_simulation()
+                    if simulation:
+                        # Assign simulation to this simulator
+                        connection.insert_in_running(simulation.id, simulator_id)
 
                 return simulation
 

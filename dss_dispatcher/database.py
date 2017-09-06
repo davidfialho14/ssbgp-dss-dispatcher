@@ -271,6 +271,25 @@ class Connection:
         if row:
             return _simulation_fromrow(row)
 
+    def running_simulation(self, simulator_id: str) -> Simulation:
+        """
+        Returns the simulation associated with the specified simulator in the
+        `running` table.
+
+        :param simulator_id: ID of simulator to obtain simulation for
+        :return: simulation associated with the specified simulator or None
+        if there is not one
+        """
+        cursor = self._connection.cursor()
+        cursor.execute(
+            "SELECT * "
+            "FROM simulation JOIN running ON simulation.id = running.id "
+            "WHERE simulator_id = ?", (simulator_id, ))
+
+        row = cursor.fetchone()
+        if row:
+            return _simulation_fromrow(row)
+
     def execute_script(self, fp):
         """ Executes a script from an opened file """
         script = fp.read()
