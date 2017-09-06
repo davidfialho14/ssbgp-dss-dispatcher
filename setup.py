@@ -21,4 +21,10 @@ setup(
     extras_require={
         'test': ['pytest'],
     },
+
+    entry_points={
+        'console_scripts': [
+            'ssbgp-dss-dispatcher=dss_dispatcher.main:main',
+        ],
+    }
 )
