@@ -48,7 +48,7 @@ class Dispatcher:
 
             while True:
                 # Generate a new ID for the new simulator
-                simulator_id = uuid.uuid4()
+                simulator_id = str(uuid.uuid4())
 
                 try:
                     connection.insert_simulator(simulator_id)
