@@ -4,11 +4,11 @@ CREATE TABLE IF NOT EXISTS simulation (
   topology    TEXT NOT NULL,
   destination INT  NOT NULL,
   repetitions INT  NOT NULL,
-  min_delay    INT  NOT NULL,
-  max_delay    INT  NOT NULL,
+  min_delay   INT  NOT NULL,
+  max_delay   INT  NOT NULL,
   threshold   INT  NOT NULL,
   stubs_file  TEXT NOT NULL,
-  seed        INT  NOT NULL
+  seed        INT
 );
 
 
