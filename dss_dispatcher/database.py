@@ -357,8 +357,7 @@ class SimulationDB:
     """ Abstraction o access the simulations database """
 
     # Path to script used to create the DB tables
-    CREATE_TABLES_SCRIPT = resource_filename(
-        Requirement.parse("ssbgp-dss-dispatcher"), 'dss_dispatcher/tables.sql')
+    CREATE_TABLES_SCRIPT = resource_filename(__name__, 'tables.sql')
 
     def __init__(self, db_file):
         """

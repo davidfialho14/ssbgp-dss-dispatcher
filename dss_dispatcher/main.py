@@ -31,8 +31,7 @@ def main():
     args = docopt(__doc__, version=version)
 
     # Setup the loggers
-    logs_config = resource_filename(
-        Requirement.parse("ssbgp-dss-dispatcher"), 'dss_dispatcher/logs.ini')
+    logs_config = resource_filename(__name__, 'logs.ini')
     fileConfig(logs_config)
 
     # Use root logger
