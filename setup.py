@@ -5,7 +5,7 @@ setup(
     name='ssbgp-dss-dispatcher',
     version=version,
     description='Dispatcher component for SS-BGP distributed simulation system',
-    url='https://github.com/davidfialho14/ssbgp-dss-dispatcher/blob/master/README.md',
+    url='https://github.com/davidfialho14/ssbgp-dss-dispatcher',
     license='MIT',
     author='David Fialho',
     author_email='fialho.david@protonmail.com',
