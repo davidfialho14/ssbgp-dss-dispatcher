@@ -79,6 +79,8 @@ class Dispatcher:
                     if simulation:
                         # Assign simulation to this simulator
                         connection.insert_in_running(simulation.id, simulator_id)
+                        # And remove it from the queue
+                        connection.delete_from_queue(simulation.id)
 
                 return simulation
 
@@ -94,7 +96,7 @@ class Dispatcher:
         :param simulator_id:  ID of the simulator that executed the simulation
         :param simulation_id: ID of the simulation that was executed
         """
-        with self._database.connect as connection:
+        with self._database.connect() as connection:
             connection.delete_from_running(simulation_id)
             connection.insert_in_complete(simulation_id, simulator_id,
                                           datetime.now())
