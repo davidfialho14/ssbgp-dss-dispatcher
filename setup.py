@@ -15,7 +15,10 @@ setup(
     install_requires=[],
 
     package_data={
-        'ssbgp-dss-dispatcher': ['dss_dispatcher/tables.sql'],
+        'ssbgp-dss-dispatcher': [
+            'dss_dispatcher/tables.sql',
+            'dss_dispatcher/logs.ini'
+        ],
     },
 
     extras_require={

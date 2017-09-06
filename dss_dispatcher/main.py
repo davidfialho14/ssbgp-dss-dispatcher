@@ -14,8 +14,10 @@ Options:
 import logging
 import os
 import sys
+from logging.config import fileConfig
 
 from docopt import docopt
+from pkg_resources import resource_filename, Requirement
 
 from dss_dispatcher.__version__ import version
 from dss_dispatcher.database import SimulationDB
@@ -23,17 +25,18 @@ from dss_dispatcher.dispatch_service import DispatchService
 from dss_dispatcher.dispatcher import Dispatcher
 
 
-LOG_FORMAT = '%(asctime)s - %(levelname)s: %(message)s'
-
-logger = logging.getLogger('')
-handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter(LOG_FORMAT))
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
-
-
 def main():
+    # The input args can be parsed before setting up the loggers because the
+    # loggers are not used for it
     args = docopt(__doc__, version=version)
+
+    # Setup the loggers
+    logs_config = resource_filename(
+        Requirement.parse("ssbgp-dss-dispatcher"), 'dss_dispatcher/logs.ini')
+    fileConfig(logs_config)
+
+    # Use root logger
+    logger = logging.getLogger('')
 
     data_dir = args['<data_dir>']
     if not os.path.isdir(data_dir):
