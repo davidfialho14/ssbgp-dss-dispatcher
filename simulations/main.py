@@ -3,9 +3,9 @@ SSBGP-DSS Simulations
 
 Usage:
   ssbgp-dss-simulations generate <topologies> <destinations> <priority>
-                                 [--c=<repetitions>] [--min=<min_delay>]
-                                 [ --max=<max_delay>] [--th=<threshold>]
-                                 [ --db=<db_path>]
+            [--reportnodes] [--c=<repetitions>] [--min=<min_delay>]
+            [--max=<max_delay>] [--th=<threshold>] [ --db=<db_path>]
+
   ssbgp-dss-simulations (-h | --help)
 
 Options:
@@ -16,6 +16,7 @@ Options:
   --max=<max_delay>  Maximum message delay [default: 1000].
   --th=<threshold>   Threshold value [default: 2000000].
   --db=<db_path>     Path to the DB file [default: simulations.db].
+  --reportnodes      Enable report nodes data individually.
 
 """
 from docopt import docopt
@@ -53,6 +54,7 @@ def main():
             min_delay=int(args['--min']),
             max_delay=int(args['--max']),
             threshold=int(args['--th']),
+            reportnodes=args['--reportnodes']
         )
 
         add_simulations(SimulationDB(db_path), simulations, priority)

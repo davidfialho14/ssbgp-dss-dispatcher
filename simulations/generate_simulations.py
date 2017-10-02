@@ -18,7 +18,7 @@ def read_destinations(destinations_path: str) -> list:
 
 def generate_simulations(topologies: list, destinations: list,
                          repetitions: int, min_delay: int, max_delay: int,
-                         threshold: int) -> list:
+                         threshold: int, reportnodes: bool) -> list:
     """
     Generates a simulation for each topology and each destination.
 
@@ -28,6 +28,7 @@ def generate_simulations(topologies: list, destinations: list,
     :param min_delay:    minimum message delay for each simulation
     :param max_delay:    maximum message delay for each simulation
     :param threshold:    threshold value for each simulation
+    :param reportnodes:  enable/disable report nodes feature
     :return: a list of generated simulations
     """
     simulations = []
@@ -42,6 +43,7 @@ def generate_simulations(topologies: list, destinations: list,
                 max_delay,
                 threshold,
                 topology.stubs,
+                reportnodes,
                 id=str(uuid.uuid4())
             ))
 
