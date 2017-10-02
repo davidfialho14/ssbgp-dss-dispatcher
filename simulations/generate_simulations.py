@@ -43,7 +43,8 @@ def generate_simulations(topologies: list, destinations: list,
                 max_delay,
                 threshold,
                 topology.stubs,
-                reportnodes,
+                seed=None,
+                reportnodes=reportnodes,
                 id=str(uuid.uuid4())
             ))
 
