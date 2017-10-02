@@ -402,4 +402,5 @@ def _simulation_fromrow(row) -> Simulation:
         threshold=row['threshold'],
         stubs_file=row['stubs_file'],
         seed=row['seed'],
+        reportnodes=True if row['reportnodes'] == 1 else False
     )

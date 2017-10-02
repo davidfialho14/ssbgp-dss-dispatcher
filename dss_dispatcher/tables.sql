@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS simulation (
   max_delay   INT  NOT NULL,
   threshold   INT  NOT NULL,
   stubs_file  TEXT NOT NULL,
-  seed        INT
+  seed        INT,
+  reportnodes BOOLEAN
 );
 
 
