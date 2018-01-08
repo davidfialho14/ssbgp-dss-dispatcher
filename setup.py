@@ -12,17 +12,11 @@ setup(
 
     packages=find_packages(),
 
-    install_requires=[],
-
     package_data={
         'dss_dispatcher': [
             'tables.sql',
             'logs.ini'
         ],
-    },
-
-    extras_require={
-        'test': ['pytest'],
     },
 
     entry_points={
