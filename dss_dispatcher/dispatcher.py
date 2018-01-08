@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from dss_dispatcher.database import SimulationDB, EntryExistsError
+from dss_dispatcher.database import SimulationDB, EntryExistsError, EntryNotFoundError
 from dss_dispatcher.simulation import Simulation
 
 
@@ -77,10 +77,15 @@ class Dispatcher:
                     # If not, then obtain the next simulation in the queue
                     simulation = connection.next_simulation()
                     if simulation:
-                        # Assign simulation to this simulator
-                        connection.insert_in_running(simulation.id, simulator_id)
-                        # And remove it from the queue
-                        connection.delete_from_queue(simulation.id)
+                        try:
+                            # Assign simulation to this simulator
+                            connection.insert_in_running(simulation.id, simulator_id)
+                        except EntryNotFoundError:
+                            # log "simulator is not registered"
+                            simulation = None
+                        else:
+                            # And remove it from the queue
+                            connection.delete_from_queue(simulation.id)
 
                 return simulation
 
