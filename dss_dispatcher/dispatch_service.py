@@ -8,7 +8,7 @@ class DispatchService:
 
     def __init__(self, dispatcher: Dispatcher, bind_address):
         self._server = SimpleXMLRPCServer(
-            bind_address, SimpleXMLRPCRequestHandler, allow_none=True)
+            bind_address, SimpleXMLRPCRequestHandler, allow_none=True, logRequests=False)
 
         self._server.register_instance(DispatchServiceInterface(dispatcher))
 
