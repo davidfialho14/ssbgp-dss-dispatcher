@@ -1,10 +1,10 @@
 import sqlite3
 from contextlib import contextmanager
-
 from datetime import datetime
-from pkg_resources import resource_filename, Requirement
 
-from dss_dispatcher.simulation import Simulation, simulation_with
+from pkg_resources import resource_filename
+
+from dss_dispatcher.simulation import Simulation
 
 
 class EntryExistsError(Exception):
@@ -359,7 +359,7 @@ class SimulationDB:
     # Path to script used to create the DB tables
     CREATE_TABLES_SCRIPT = resource_filename(__name__, 'tables.sql')
 
-    def __init__(self, db_file):
+    def __init__(self, db_file: str):
         """
         Initializes a new simulation DB.
 
@@ -391,9 +391,8 @@ def _is_foreign_key_constraint(error: sqlite3.IntegrityError):
 
 
 def _simulation_fromrow(row) -> Simulation:
-    return simulation_with(
+    return Simulation(
         id=row['id'],
-        report_path=row['report_path'],
         topology=row['topology'],
         destination=row['destination'],
         repetitions=row['repetitions'],
@@ -402,4 +401,5 @@ def _simulation_fromrow(row) -> Simulation:
         threshold=row['threshold'],
         stubs_file=row['stubs_file'],
         seed=row['seed'],
+        enable_reportnodes=True if row['reportnodes'] == 1 else False
     )

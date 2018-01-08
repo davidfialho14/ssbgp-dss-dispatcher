@@ -23,7 +23,8 @@ def create_simulation(id: str):
         max_delay=1,
         threshold=1,
         stubs_file="topology.stubs",
-        seed=1234
+        seed=1234,
+        reportnodes=True
     )
 
 
