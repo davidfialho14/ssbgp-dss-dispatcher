@@ -2,8 +2,8 @@
 SSBGP-DSS Dispatcher
 
 Usage:
-  ssbgp-dss-dispatcher <install_dir> [--port=<port>]
-  ssbgp-dss-dispatcher (-h | --help)
+  dss-dispatcher <install_dir> [--port=<port>]
+  dss-dispatcher (-h | --help)
 
 Options:
   -h --help      Show this screen.

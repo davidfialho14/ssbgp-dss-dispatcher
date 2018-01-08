@@ -27,7 +27,7 @@ setup(
 
     entry_points={
         'console_scripts': [
-            'ssbgp-dss-dispatcher=dss_dispatcher.main:main',
+            'dss-dispatcher=dss_dispatcher.main:main',
             'ssbgp-dss-simulations=simulations.main:main',
         ],
     }
