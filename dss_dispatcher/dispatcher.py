@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime
 
@@ -13,7 +14,7 @@ class OperationError(Exception):
         self.raised = raised
 
 
-# TODO add a logger
+logger = logging.getLogger('dispatcher')
 
 
 class Dispatcher:
@@ -42,19 +43,22 @@ class Dispatcher:
         simulator.
         """
         with self._database.connect() as connection:
-
-            while True:
+            simulator_id = None
+            while simulator_id is None:
                 # Generate a new ID for the new simulator
                 simulator_id = str(uuid.uuid4())
 
                 try:
                     connection.insert_simulator(simulator_id)
-                    return simulator_id
 
                 except EntryExistsError:
                     # There is already a simulator with that ID
                     # Try again
+                    simulator_id = None
                     continue
+
+            logger.info(f"registered new simulator {simulator_id}")
+            return simulator_id
 
     def next_simulation(self, simulator_id: str) -> Simulation:
         """
@@ -63,6 +67,8 @@ class Dispatcher:
         """
         with self._database.connect() as db:
             try:
+                logger.info(f"simulator {simulator_id} requested a simulation")
+
                 # Obtain the simulation associated with the given simulator (if there is one)
                 simulation = db.running_simulation(simulator_id)
 
@@ -81,10 +87,13 @@ class Dispatcher:
                             # Indicate there are no simulations in the queue
                             simulation = None
 
+                logger.info(f"responded with {simulation.id}")
+
                 return simulation
 
             except Exception as error:
                 db.rollback()
+                logger.exception("unexpected error")
                 raise OperationError(str(error), error)
 
     def notify_finished(self, simulator_id: str, simulation_id: str):
@@ -97,3 +106,5 @@ class Dispatcher:
         with self._database.connect() as connection:
             connection.delete_from_running(simulation_id)
             connection.insert_in_complete(simulation_id, simulator_id, datetime.now())
+
+        logger.info(f"simulator {simulator_id} finished {simulation_id}")
