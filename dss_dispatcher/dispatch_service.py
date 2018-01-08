@@ -38,8 +38,8 @@ class DispatchServiceInterface:
         simulation = self._dispatcher.next_simulation(simulator_id)
 
         # noinspection PyProtectedMember
-        # Although the method name starts with an underscore, this is a
-        # documented method. See https://docs.python.org/3/library/collections.html#collections.somenamedtuple._asdict
+        # Although the method name starts with an underscore, this is a documented method.
+        # See https://docs.python.org/3/library/collections.html#collections.somenamedtuple._asdict
         return dict(simulation._asdict()) if simulation else None
 
     def notify_finished(self, simulator_id: str, simulation_id: str):
