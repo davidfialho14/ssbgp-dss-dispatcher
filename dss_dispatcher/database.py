@@ -393,7 +393,6 @@ def _is_foreign_key_constraint(error: sqlite3.IntegrityError):
 def _simulation_fromrow(row) -> Simulation:
     return Simulation(
         id=row['id'],
-        report_path=row['report_path'],
         topology=row['topology'],
         destination=row['destination'],
         repetitions=row['repetitions'],

@@ -1,6 +1,5 @@
 CREATE TABLE IF NOT EXISTS simulation (
   id          TEXT PRIMARY KEY,
-  report_path TEXT NOT NULL,
   topology    TEXT NOT NULL,
   destination INT  NOT NULL,
   repetitions INT  NOT NULL,
